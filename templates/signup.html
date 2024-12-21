@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup</title>
+    <link rel="stylesheet" href="/static/signup.css"></head>
+<body>
+    <div class="container">
+        <h1>Sign Up</h1>
+        <form action="/signup-choice" method="POST">
+            <label id="role">Select Role:</label><br>
+            <select id="role" name="role" required>
+                <option value="student">Student</option>
+                <option value="instructor">Instructor</option>
+            </select>
+            <button type="submit">Next</button>
+        </form>
+    </div>
+</body>
+</html>

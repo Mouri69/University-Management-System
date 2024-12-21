@@ -5,9 +5,6 @@ body, p, input, button {
     box-sizing: border-box;
 }
 
-h1{
-    
-}
 /* General body styling */
 body {
     font-family: Arial, sans-serif;
@@ -66,7 +63,7 @@ form input:focus {
 form button {
     width: 100%;
     padding: 12px;
-    background-color: #4a90e2;
+    background-color: #5C6BC0;
     color: #ffffff;
     border: none;
     border-radius: 4px;
@@ -77,5 +74,5 @@ form button {
 
 /* Submit button hover effect */
 form button:hover {
-    background-color: #357abd;
+    background-color: #3f4b91;
 }
