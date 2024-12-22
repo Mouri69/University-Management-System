@@ -478,26 +478,51 @@ def save_attendance():
 @app.route('/remove-student/<int:student_id>', methods=['POST'])
 def remove_student(student_id):
     try:
+        print(f"Starting removal process for student_id: {student_id}")
+        
         conn = pyodbc.connect(CONNECTION_STRING)
         cursor = conn.cursor()
-        
-        # First, remove all attendance records for this student
-        cursor.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
-        
-        # Then, remove all course enrollments for this student
-        cursor.execute("DELETE FROM StudentCourses WHERE student_id = ?", (student_id,))
-        
-        # Finally, remove the student from the students table
-        cursor.execute("DELETE FROM students WHERE student_id = ?", (student_id,))
-        
-        conn.commit()
-        conn.close()
-        
-        flash('Student has been removed successfully')
-        return redirect(url_for('instructor_dashboard'))
-        
-    except Exception as e:
-        return f"An error occurred: {e}"
 
+        # First check if student exists
+        cursor.execute("SELECT student_id FROM students WHERE student_id = ?", (student_id,))
+        student = cursor.fetchone()
+        if not student:
+            print(f"No student found with ID: {student_id}")
+            return f"No student found with ID: {student_id}"
+
+        try:
+            # Remove all attendance records
+            cursor.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
+            attendance_count = cursor.rowcount
+            print(f"Deleted {attendance_count} attendance records")
+
+            # Remove all course enrollments
+            cursor.execute("DELETE FROM StudentCourses WHERE student_id = ?", (student_id,))
+            courses_count = cursor.rowcount
+            print(f"Deleted {courses_count} course enrollments")
+
+            # Remove the student
+            cursor.execute("DELETE FROM students WHERE student_id = ?", (student_id,))
+            student_count = cursor.rowcount
+            print(f"Deleted {student_count} student record")
+
+            conn.commit()
+            print("Changes committed successfully")
+            
+            return redirect(url_for('instructor_dashboard'))
+
+        except Exception as db_error:
+            conn.rollback()
+            print(f"Database error occurred: {db_error}")
+            return f"Database error occurred: {db_error}"
+        
+        finally:
+            conn.close()
+            print("Connection closed")
+
+    except Exception as e:
+        print(f"General error occurred: {e}")
+        return f"General error occurred: {e}"
+    
 if __name__ == '__main__':
     app.run(debug=True)
