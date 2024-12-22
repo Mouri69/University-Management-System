@@ -98,6 +98,24 @@ input[type="checkbox"] {
 .save-btn:hover {
     background-color: #218838;
 }
+.remove-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.remove-btn:hover {
+    background-color: #c82333;
+}
 
 .yellow {
     background-color: rgb(255, 255, 0) !important;

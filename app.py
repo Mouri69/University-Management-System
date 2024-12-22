@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import pyodbc
-from datetime import date
+from datetime import datetime
 
 app = Flask(__name__)
+app.secret_key= '1234567891234567'
 
 # SQL Server database configuration
 SQL_SERVER = 'MOURI\\SQLEXPRESS'  # Use double backslashes for escaping
@@ -33,8 +34,11 @@ def login():
         cursor.execute("SELECT * FROM Instructors WHERE email = ? AND password = ?", (email, password))
         instructor = cursor.fetchone()
 
-        # Check if student data was found
         if student:
+            # Store student ID in session
+            session['student_id'] = student.student_id
+            session['user_type'] = 'student'
+
             # Convert the pyodbc.Row object to a dictionary
             student_dict = {
                 'student_id': student.student_id,
@@ -47,7 +51,7 @@ def login():
                 'total_absence': student.total_absence
             }
 
-            # Fetch courses for the student
+            # Fetch enrolled courses for the student
             cursor.execute("""
                 SELECT c.course_id, c.course_name, c.course_code
                 FROM Courses c
@@ -55,26 +59,179 @@ def login():
                 WHERE sc.student_id = ?
             """, student.student_id)
             
-            courses = [{"id": row.course_id, "name": row.course_name, "code": row.course_code} for row in cursor.fetchall()]
+            enrolled_courses = [{"id": row.course_id, "name": row.course_name, "code": row.course_code} 
+                              for row in cursor.fetchall()]
 
             conn.close()
-            return render_template('student_dashboard.html', student=student_dict, courses=courses)
+            return render_template('student_dashboard.html', student=student_dict, enrolled_courses=enrolled_courses)
         
-        # Check if instructor data was found
         elif instructor:
-            # Fetch all students' data when logged in as instructor
-            cursor.execute("SELECT * FROM students")  # Query to get all students' data
+            session['student_id'] = instructor.student_id
+            session['user_type'] = 'instructor'
+            
+            # Fetch all students' data
+            cursor.execute("SELECT * FROM students")
             students_data = cursor.fetchall()
             conn.close()
-
-            # Pass the student data to the template and display it
+            
             return render_template('instructor_dashboard.html', students=students_data)
         else:
             conn.close()
-            return "Invalid email or password"
+            flash('Invalid email or password')
+            return redirect(url_for('home'))
+            
     except Exception as e:
         return f"An error occurred: {e}"
 
+@app.route('/student-dashboard')
+def student_dashboard():
+    if 'student_id' not in session:
+        return redirect(url_for('home'))
+    
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+        
+        # Fetch student information
+        cursor.execute("SELECT * FROM students WHERE student_id = ?", (session['student_id'],))
+        student = cursor.fetchone()
+        
+        # Convert to dictionary
+        student_dict = {
+            'student_id': student.student_id,
+            'fname': student.fname,
+            'lname': student.lname,
+            'email': student.email,
+            'phone': student.phone,
+            'address': student.address,
+            'birthdate': student.birthdate,
+            'total_absence': student.total_absence
+        }
+        
+        # Fetch enrolled courses
+        cursor.execute("""
+            SELECT c.course_id, c.course_name, c.course_code
+            FROM Courses c
+            JOIN StudentCourses sc ON c.course_id = sc.course_id
+            WHERE sc.student_id = ?
+        """, session['student_id'])
+        
+        enrolled_courses = [{"id": row.course_id, "name": row.course_name, "code": row.course_code} 
+                          for row in cursor.fetchall()]
+        
+        conn.close()
+        return render_template('student_dashboard.html', student=student_dict, enrolled_courses=enrolled_courses)
+        
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+@app.route('/enrolled-courses')
+def enrolled_courses():
+    if 'student_id' not in session:
+        return redirect(url_for('home'))
+    
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+        
+        # Fetch student information
+        cursor.execute("SELECT * FROM students WHERE student_id = ?", (session['student_id'],))
+        student = cursor.fetchone()
+        
+        # Convert to dictionary
+        student_dict = {
+            'student_id': student.student_id,
+            'fname': student.fname,
+            'lname': student.lname
+        }
+        
+        # Fetch enrolled courses
+        cursor.execute("""
+            SELECT c.course_id, c.course_name, c.course_code
+            FROM Courses c
+            JOIN StudentCourses sc ON c.course_id = sc.course_id
+            WHERE sc.student_id = ?
+        """, session['student_id'])
+        
+        enrolled_courses = [{"course_id": row.course_id, "course_name": row.course_name, "course_code": row.course_code} 
+                          for row in cursor.fetchall()]
+        
+        # Fetch available courses (not enrolled)
+        cursor.execute("""
+            SELECT c.course_id, c.course_name, c.course_code
+            FROM Courses c
+            WHERE c.course_id NOT IN (
+                SELECT course_id FROM StudentCourses WHERE student_id = ?
+            )
+        """, session['student_id'])
+        
+        available_courses = [{"course_id": row.course_id, "course_name": row.course_name, "course_code": row.course_code} 
+                           for row in cursor.fetchall()]
+        
+        conn.close()
+        return render_template('rolled-courses.html', 
+                             student=student_dict,
+                             enrolled_courses=enrolled_courses,
+                             available_courses=available_courses)
+                             
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+@app.route('/enroll-course/<int:course_id>', methods=['POST'])
+def enroll_course(course_id):
+    if 'student_id' not in session:
+        return redirect(url_for('home'))
+    
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+        
+        # Check if already enrolled
+        cursor.execute("""
+            SELECT * FROM StudentCourses 
+            WHERE student_id = ? AND course_id = ?
+        """, (session['student_id'], course_id))
+        
+        if cursor.fetchone():
+            flash('You are already enrolled in this course')
+        else:
+            # Enroll the student
+            cursor.execute("""
+                INSERT INTO StudentCourses (student_id, course_id)
+                VALUES (?, ?)
+            """, (session['student_id'], course_id))
+            conn.commit()
+            flash('Successfully enrolled in the course')
+        
+        conn.close()
+        return redirect(url_for('enrolled_courses'))
+        
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+@app.route('/unenroll-course/<int:course_id>', methods=['POST'])
+def unenroll_course(course_id):
+    if 'student_id' not in session:
+        return redirect(url_for('home'))
+    
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+        
+        # Remove the enrollment
+        cursor.execute("""
+            DELETE FROM StudentCourses 
+            WHERE student_id = ? AND course_id = ?
+        """, (session['student_id'], course_id))
+        
+        conn.commit()
+        conn.close()
+        
+        flash('Successfully unenrolled from the course')
+        return redirect(url_for('enrolled_courses'))
+        
+    except Exception as e:
+        return f"An error occurred: {e}"
 # Route to handle displaying the sign-up choice page (GET method)
 @app.route('/signup-choice', methods=['GET'])
 def signup_choice():
@@ -318,7 +475,29 @@ def save_attendance():
     except Exception as e:
         return f"An error occurred: {e}"
 
-
+@app.route('/remove-student/<int:student_id>', methods=['POST'])
+def remove_student(student_id):
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+        
+        # First, remove all attendance records for this student
+        cursor.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
+        
+        # Then, remove all course enrollments for this student
+        cursor.execute("DELETE FROM StudentCourses WHERE student_id = ?", (student_id,))
+        
+        # Finally, remove the student from the students table
+        cursor.execute("DELETE FROM students WHERE student_id = ?", (student_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        flash('Student has been removed successfully')
+        return redirect(url_for('instructor_dashboard'))
+        
+    except Exception as e:
+        return f"An error occurred: {e}"
 
 if __name__ == '__main__':
     app.run(debug=True)

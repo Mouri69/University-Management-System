@@ -20,6 +20,7 @@
                     <th>Email</th>
                     <th>Total Absences</th>
                     <th>Mark Absent Today</th>
+                    <th>Actions</th>  <!-- New column -->
                 </tr>
             </thead>
             <tbody>
@@ -29,11 +30,18 @@
                     <td>{{ student[1] }}</td>
                     <td>{{ student[2] }}</td>
                     <td>{{ student[3] }}</td>
-                    <td>{{ student[8] }}</td>  <!-- Display total_absence here -->
+                    <td>{{ student[8] }}</td>
                     <td>
                         <input type="hidden" name="student_id" value="{{ student[0] }}">
                         <input type="checkbox" name="status_{{ student[0] }}" 
                                {% if student[5] == 1 %}checked{% endif %}>
+                    </td>
+                    <td>
+                        {% if student[8]|int >= 8 %}
+                        <form action="{{ url_for('remove_student', student_id=student[0]) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="remove-btn" onclick="return confirm('Are you sure you want to remove this student?')">✖</button>
+                        </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
