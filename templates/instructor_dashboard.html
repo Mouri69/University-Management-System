@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instructor Dashboard</title>
     <link rel="stylesheet" href="/static/instructor_dashboard.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- Include jQuery -->
 </head>
 <body>
     <h1>Logged in as Instructor</h1>
@@ -38,9 +39,12 @@
                     </td>
                     <td>
                         {% if student[8]|int >= 8 %}
-                        <form action="{{ url_for('remove_student', student_id=student[0]) }}" method="POST" style="display: inline;">
-                            <button type="submit" class="remove-btn" onclick="return confirm('Are you sure you want to remove this student? ID: ' + '{{ student[0] }}')">✖</button>
-                        </form>
+                        <!-- Use a button or link to trigger AJAX request for removal -->
+                        <button type="button" class="remove-btn" 
+                                data-student-id="{{ student[0] }}" 
+                                onclick="removeStudent('{{ student[0] }}')">
+                            ✖
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
@@ -50,5 +54,29 @@
         
         <button type="submit" class="save-btn">Save Attendance</button>
     </form>
+
+    <script>
+        // JavaScript to handle student removal with AJAX
+        function removeStudent(studentId) {
+            if (confirm("Are you sure you want to remove this student? ID: " + studentId)) {
+                $.ajax({
+                    url: '/remove_student/' + studentId,  // Make AJAX request to remove_student route
+                    method: 'POST',
+                    success: function(response) {
+                        // On success, remove the student's row from the table
+                        $('tr').each(function() {
+                            if ($(this).find('td:first').text() == studentId) {
+                                $(this).remove();  // Remove the row with this student ID
+                            }
+                        });
+                        alert('Student removed successfully!');
+                    },
+                    error: function(error) {
+                        alert('Error removing student');
+                    }
+                });
+            }
+        }
+    </script>
 </body>
 </html>

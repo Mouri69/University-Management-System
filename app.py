@@ -475,54 +475,41 @@ def save_attendance():
     except Exception as e:
         return f"An error occurred: {e}"
 
-@app.route('/remove-student/<int:student_id>', methods=['POST'])
+@app.route('/remove_student/<int:student_id>', methods=['POST'])
 def remove_student(student_id):
+    print("Starting removal process for student_id:", student_id)
+
     try:
-        print(f"Starting removal process for student_id: {student_id}")
-        
         conn = pyodbc.connect(CONNECTION_STRING)
         cursor = conn.cursor()
 
-        # First check if student exists
+        # Check if the student exists
         cursor.execute("SELECT student_id FROM students WHERE student_id = ?", (student_id,))
         student = cursor.fetchone()
         if not student:
             print(f"No student found with ID: {student_id}")
-            return f"No student found with ID: {student_id}"
+            return "No student found with this ID", 400
 
-        try:
-            # Remove all attendance records
-            cursor.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
-            attendance_count = cursor.rowcount
-            print(f"Deleted {attendance_count} attendance records")
+        # Begin deletion process
+        cursor.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
+        cursor.execute("DELETE FROM StudentCourses WHERE student_id = ?", (student_id,))
+        cursor.execute("DELETE FROM students WHERE student_id = ?", (student_id,))
 
-            # Remove all course enrollments
-            cursor.execute("DELETE FROM StudentCourses WHERE student_id = ?", (student_id,))
-            courses_count = cursor.rowcount
-            print(f"Deleted {courses_count} course enrollments")
+        # Commit changes
+        conn.commit()
 
-            # Remove the student
-            cursor.execute("DELETE FROM students WHERE student_id = ?", (student_id,))
-            student_count = cursor.rowcount
-            print(f"Deleted {student_count} student record")
-
-            conn.commit()
-            print("Changes committed successfully")
-            
-            return redirect(url_for('instructor_dashboard'))
-
-        except Exception as db_error:
-            conn.rollback()
-            print(f"Database error occurred: {db_error}")
-            return f"Database error occurred: {db_error}"
+        return "Student removed successfully", 200  # Return success message for AJAX
         
-        finally:
-            conn.close()
-            print("Connection closed")
-
     except Exception as e:
-        print(f"General error occurred: {e}")
-        return f"General error occurred: {e}"
+        conn.rollback()
+        print(f"Error during removal: {e}")
+        return "Error occurred during removal", 500
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
     
 if __name__ == '__main__':
     app.run(debug=True)
