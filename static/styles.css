@@ -8,7 +8,7 @@ body, p, input, button {
 /* General body styling */
 body {
     font-family: Arial, sans-serif;
-    background-color: #f7f9fc;
+    background-color: #f4f7fc;
     display: flex;
     justify-content: center;
     align-items: center;

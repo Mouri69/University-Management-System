@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enrolled Courses</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .course-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .course-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            width: 250px;
+        }
+        .enroll-btn, .unenroll-btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+        .unenroll-btn {
+            background-color: #f44336;
+        }
+        .back-btn {
+            background-color: #008CBA;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('student_dashboard') }}" class="back-btn">Back to Dashboard</a>
+    <h1>Enrolled Courses for {{ student.fname }} {{ student.lname }}</h1>
+    
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <h2>Your Enrolled Courses</h2>
+    <div class="course-list">
+        {% for course in enrolled_courses %}
+            <div class="course-card">
+                <h3>{{ course.course_name }}</h3>
+                <p>Course Code: {{ course.course_code }}</p>
+                <form action="{{ url_for('unenroll_course', course_id=course.course_id) }}" method="post">
+                    <input type="hidden" name="student_id" value="{{ student.student_id }}">
+                    <button type="submit" class="unenroll-btn">Unenroll</button>
+                </form>
+            </div>
+        {% else %}
+            <p>You are not enrolled in any courses.</p>
+        {% endfor %}
+    </div>
+
+    <h2>Available Courses</h2>
+    <div class="course-list">
+        {% for course in available_courses %}
+            <div class="course-card">
+                <h3>{{ course.course_name }}</h3>
+                <p>Course Code: {{ course.course_code }}</p>
+                <form action="{{ url_for('enroll_course', course_id=course.course_id) }}" method="post">
+                    <input type="hidden" name="student_id" value="{{ student.student_id }}">
+                    <button type="submit" class="enroll-btn">Enroll</button>
+                </form>
+            </div>
+        {% else %}
+            <p>No courses available for enrollment.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>
+

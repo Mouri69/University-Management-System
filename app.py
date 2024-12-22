@@ -21,7 +21,6 @@ def login():
     email = request.form['email']
     password = request.form['password']
 
-    # Check if the user exists in the students table
     try:
         conn = pyodbc.connect(CONNECTION_STRING)
         cursor = conn.cursor()
@@ -34,26 +33,44 @@ def login():
         cursor.execute("SELECT * FROM Instructors WHERE email = ? AND password = ?", (email, password))
         instructor = cursor.fetchone()
 
-        conn.close()
-
         # Check if student data was found
         if student:
-            return "Logged in as Student"
+            # Convert the pyodbc.Row object to a dictionary
+            student_dict = {
+                'student_id': student.student_id,
+                'fname': student.fname,
+                'lname': student.lname,
+                'email': student.email,
+                'phone': student.phone,
+                'address': student.address,
+                'birthdate': student.birthdate,
+                'total_absence': student.total_absence
+            }
+
+            # Fetch courses for the student
+            cursor.execute("""
+                SELECT c.course_id, c.course_name, c.course_code
+                FROM Courses c
+                JOIN StudentCourses sc ON c.course_id = sc.course_id
+                WHERE sc.student_id = ?
+            """, student.student_id)
+            
+            courses = [{"id": row.course_id, "name": row.course_name, "code": row.course_code} for row in cursor.fetchall()]
+
+            conn.close()
+            return render_template('student_dashboard.html', student=student_dict, courses=courses)
+        
         # Check if instructor data was found
         elif instructor:
             # Fetch all students' data when logged in as instructor
-            try:
-                conn = pyodbc.connect(CONNECTION_STRING)
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM students")  # Query to get all students' data
-                students_data = cursor.fetchall()
-                conn.close()
+            cursor.execute("SELECT * FROM students")  # Query to get all students' data
+            students_data = cursor.fetchall()
+            conn.close()
 
-                # Pass the student data to the template and display it
-                return render_template('instructor_dashboard.html', students=students_data)
-            except Exception as e:
-                return f"An error occurred while fetching student data: {e}"
+            # Pass the student data to the template and display it
+            return render_template('instructor_dashboard.html', students=students_data)
         else:
+            conn.close()
             return "Invalid email or password"
     except Exception as e:
         return f"An error occurred: {e}"
@@ -83,7 +100,6 @@ def signup_student():
 @app.route('/signup-instructor')
 def signup_instructor():
     return render_template('signup-instructor.html')
-
 
 # Route to handle Student Sign Up form submission
 @app.route('/signup-student', methods=['POST'])
@@ -144,34 +160,33 @@ def instructor_dashboard():
     try:
         conn = pyodbc.connect(CONNECTION_STRING)
         cursor = conn.cursor()
-
-        # Query to fetch student data along with total absences and today's status
+        
+        # Explicitly specify columns and their order
         query = """
         SELECT 
-            s.student_id,
-            s.fname,
-            s.lname,
-            s.email,
-            COALESCE(
-                (SELECT COUNT(*) 
-                 FROM attendance a 
-                 WHERE a.student_id = s.student_id 
-                 AND a.status = 1), 0) as total_absences,
-            COALESCE(
-                (SELECT TOP 1 status
-                 FROM attendance 
-                 WHERE student_id = s.student_id 
-                 AND CONVERT(DATE, date) = CONVERT(DATE, GETDATE())), 0) as today_status
-        FROM students s
-        ORDER BY s.student_id
+        s.student_id,
+        s.fname,
+        s.lname,
+        s.email,
+        COALESCE(CAST((SELECT COUNT(*) 
+                        FROM attendance a 
+                        WHERE a.student_id = s.student_id 
+                        AND a.status = 1) AS INT), 0) as total_absences,
+        COALESCE((SELECT TOP 1 status
+                FROM attendance 
+                WHERE student_id = s.student_id 
+                AND CONVERT(DATE, date) = CONVERT(DATE, GETDATE())
+                ), 0) as today_status
+    FROM students s
+    ORDER BY s.student_id
         """
-
+        
         cursor.execute(query)
         students = cursor.fetchall()
         conn.close()
 
         return render_template('instructor_dashboard.html', students=students)
-
+    
     except Exception as e:
         return f"An error occurred: {e}"
 
