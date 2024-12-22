@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for
 import pyodbc
+from datetime import date
 
 app = Flask(__name__)
 
@@ -83,6 +84,7 @@ def signup_student():
 def signup_instructor():
     return render_template('signup-instructor.html')
 
+
 # Route to handle Student Sign Up form submission
 @app.route('/signup-student', methods=['POST'])
 def submit_student():
@@ -136,6 +138,172 @@ def submit_instructor():
         return "Instructor data inserted successfully!"
     except Exception as e:
         return f"An error occurred: {e}"
+
+@app.route('/instructor-dashboard')
+def instructor_dashboard():
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+
+        # Query to fetch student data along with total absences and today's status
+        query = """
+        SELECT 
+            s.student_id,
+            s.fname,
+            s.lname,
+            s.email,
+            COALESCE(
+                (SELECT COUNT(*) 
+                 FROM attendance a 
+                 WHERE a.student_id = s.student_id 
+                 AND a.status = 1), 0) as total_absences,
+            COALESCE(
+                (SELECT TOP 1 status
+                 FROM attendance 
+                 WHERE student_id = s.student_id 
+                 AND CONVERT(DATE, date) = CONVERT(DATE, GETDATE())), 0) as today_status
+        FROM students s
+        ORDER BY s.student_id
+        """
+
+        cursor.execute(query)
+        students = cursor.fetchall()
+        conn.close()
+
+        return render_template('instructor_dashboard.html', students=students)
+
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+@app.route('/update-attendance', methods=['POST'])
+def update_attendance():
+    try:
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+
+        form_data = request.form
+        for key in form_data:
+            if key.startswith('status_'):
+                student_id = key.split('_')[1]
+                is_absent = 1 if form_data[key] == 'on' else 0  # Check if the checkbox was checked
+
+                # Check if there's already an attendance record for today
+                check_query = """
+                SELECT attendance_id 
+                FROM attendance 
+                WHERE student_id = ? 
+                AND CONVERT(DATE, date) = CONVERT(DATE, GETDATE())
+                """
+                cursor.execute(check_query, student_id)
+                existing_record = cursor.fetchone()
+
+                if existing_record:  # If attendance exists, update status
+                    update_query = """
+                    UPDATE attendance
+                    SET status = ?
+                    WHERE attendance_id = ?
+                    """
+                    cursor.execute(update_query, (is_absent, existing_record[0]))
+
+                else:  # If no attendance exists, insert a new record
+                    insert_query = """
+                    INSERT INTO attendance (student_id, status, date)
+                    VALUES (?, ?, GETDATE())
+                    """
+                    cursor.execute(insert_query, (student_id, is_absent))
+
+                # Increment total_absence in students table if marked absent
+                if is_absent == 1:
+                    print(f"Incrementing total_absence for student_id: {student_id}")
+                    increment_absence_query = """
+                    UPDATE students
+                    SET total_absence = total_absence + 1
+                    WHERE student_id = ?
+                    """
+                    cursor.execute(increment_absence_query, student_id)
+
+        # Commit changes to the database
+        conn.commit()
+
+        # Re-fetch student data to display updated absences
+        fetch_students_query = """
+        SELECT 
+            s.student_id,
+            s.fname,
+            s.lname,
+            s.email,
+            COALESCE((SELECT COUNT(*) 
+                      FROM attendance a 
+                      WHERE a.student_id = s.student_id 
+                      AND a.status = 1), 0) as total_absences,
+            COALESCE((SELECT TOP 1 status
+                      FROM attendance 
+                      WHERE student_id = s.student_id 
+                      AND CONVERT(DATE, date) = CONVERT(DATE, GETDATE())
+                    ), 0) as today_status
+        FROM students s
+        ORDER BY s.student_id
+        """
+        cursor.execute(fetch_students_query)
+        students = cursor.fetchall()
+
+        conn.close()
+
+        # Redirect to dashboard with updated data
+        return render_template('login.html', students=students)
+
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+
+
+@app.route('/save-attendance', methods=['POST'])
+def save_attendance():
+    try:
+        # Get a list of student IDs and their status from the form
+        students_data = request.form.getlist('student_data')  # Assuming 'student_data' is a list of student info
+        
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+
+        for student_data in students_data:
+            student_id = student_data['student_id']
+            status = student_data['status']
+            
+            # Query to check if there's already an attendance record for the current date
+            query = """
+            SELECT attendance_id FROM attendance
+            WHERE student_id = ? AND CONVERT(DATE, date) = CONVERT(DATE, GETDATE());
+            """
+            
+            cursor.execute(query, (student_id,))
+            result = cursor.fetchone()
+
+            if result:
+                # If attendance record exists, update the status
+                update_query = """
+                UPDATE attendance
+                SET status = ?
+                WHERE attendance_id = ?;
+                """
+                cursor.execute(update_query, (status, result.attendance_id))
+            else:
+                # If no attendance record exists for this student, insert a new record
+                insert_query = """
+                INSERT INTO attendance (student_id, status, date)
+                VALUES (?, ?, CONVERT(DATE, GETDATE()));
+                """
+                cursor.execute(insert_query, (student_id, status))
+
+        conn.commit()
+        conn.close()
+        print("hello")
+        return redirect(url_for('instructor_dashboard'))
+    
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

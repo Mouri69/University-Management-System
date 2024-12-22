@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Choice</title>
+    <link rel="stylesheet" href="/static/signup.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Instructor Choice</h1>
+        <form action="/instructor-choice" method="POST">
+            <label for="choice">Select Choice:</label><br>
+            <select id="choice" name="choice" required>
+                <option value="attendance">Attendance</option>
+                <option value="grades">Grades</option>
+            </select>
+            <button type="submit">Next</button>
+        </form>
+    </div>
+</body>
+</html>

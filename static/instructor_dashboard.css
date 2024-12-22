@@ -32,25 +32,20 @@ table {
 }
 
 /* Table header styles */
+
+th, td {
+    padding: 10px;
+    text-align: left;
+    border: 1px solid #ddd;
+}
+
 th {
     background-color: #007bff;
     color: white;
-    padding: 12px 15px;
-    text-align: left;
 }
 
-/* Table cell styles */
-td {
-    background-color: #fff;
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
 
-/* Table row hover effect */
-tr:hover {
-    background-color: #f1f1f1;
-}
+
 
 /* Responsive styling */
 @media (max-width: 768px) {
@@ -67,4 +62,47 @@ tr:hover {
     h1, h2 {
         font-size: 24px;
     }
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+tr:nth-child(even) {
+    background-color: #e5e5e5;
+}
+
+input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+}
+
+.save-btn {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.save-btn:hover {
+    background-color: #218838;
+}
+
+.yellow {
+    background-color: rgb(255, 255, 0) !important;
+}
+
+.red {
+    background-color: red !important;
 }
